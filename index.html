@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="data:," />
+  <title>EventLog Analyzer Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #05090d;
+      --surface: #0a1118;
+      --surface-2: #0e1720;
+      --surface-3: #111e29;
+      --border: #22313d;
+      --border-strong: #314655;
+      --text: #f1f6f8;
+      --muted: #93a7b4;
+      --faint: #617481;
+      --cyan: #41d6de;
+      --cyan-soft: rgba(65, 214, 222, .12);
+      --red: #ff5c69;
+      --red-soft: rgba(255, 92, 105, .12);
+      --amber: #f6b94b;
+      --amber-soft: rgba(246, 185, 75, .12);
+      --green: #55d98a;
+      --green-soft: rgba(85, 217, 138, .12);
+      --shadow: 0 18px 46px rgba(0, 0, 0, .32);
+      --grid: rgba(98, 133, 153, .08);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #081018;
+        --surface: #0d1720;
+        --surface-2: #111e28;
+        --surface-3: #172733;
+        --border: #2b3d49;
+        --border-strong: #46606f;
+        --text: #f4f8fa;
+        --muted: #a8bac4;
+        --faint: #778e9b;
+        --cyan: #58dce3;
+        --cyan-soft: rgba(88, 220, 227, .12);
+        --red: #ff6674;
+        --red-soft: rgba(255, 102, 116, .13);
+        --amber: #ffc45b;
+        --amber-soft: rgba(255, 196, 91, .13);
+        --green: #62df96;
+        --green-soft: rgba(98, 223, 150, .12);
+        --shadow: 0 18px 46px rgba(0, 0, 0, .28);
+        --grid: rgba(114, 156, 177, .08);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+        var(--bg);
+      background-size: 42px 42px;
+      color: var(--text);
+      font-family: "IBM Plex Sans", sans-serif;
+      line-height: 1.5;
+    }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    a { color: inherit; }
+    .mono { font-family: "IBM Plex Mono", monospace; }
+    .shell { width: min(1440px, 100%); margin: 0 auto; padding: 28px clamp(18px, 3.2vw, 48px) 52px; }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 4px 0 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand-block { min-width: 0; }
+    .system-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--green);
+      font: 600 11px/1 "IBM Plex Mono", monospace;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .pulse {
+      width: 8px; height: 8px; border-radius: 50%; background: currentColor;
+      box-shadow: 0 0 0 5px var(--green-soft);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes pulse { 50% { box-shadow: 0 0 0 9px transparent; } }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } .pulse { animation: none; } }
+    h1 { font-size: clamp(32px, 4vw, 52px); letter-spacing: -.045em; line-height: 1; margin: 0; font-weight: 700; }
+    .subtitle { margin: 10px 0 0; color: var(--muted); font-size: clamp(15px, 1.5vw, 18px); }
+    .credit { margin: 5px 0 0; color: var(--faint); font-size: 13px; }
+    .window {
+      flex: 0 0 auto;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: 12px 15px;
+      min-width: 220px;
+      box-shadow: var(--shadow);
+    }
+    .window span { display: block; }
+    .window .label { color: var(--faint); font: 500 10px/1.2 "IBM Plex Mono", monospace; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .window .date { font: 500 13px/1.3 "IBM Plex Mono", monospace; }
+
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin: 20px 0; }
+    .kpi {
+      position: relative;
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 20px;
+      min-height: 132px;
+    }
+    .kpi::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--accent, var(--cyan)); }
+    .kpi .icon { color: var(--accent, var(--cyan)); width: 22px; height: 22px; margin-bottom: 18px; }
+    .kpi .value { display: block; font: 600 clamp(25px, 2.6vw, 36px)/1 "IBM Plex Mono", monospace; letter-spacing: -.04em; }
+    .kpi .label { color: var(--muted); font-size: 12px; margin-top: 9px; display: block; }
+    .kpi.events { --accent: var(--cyan); }
+    .kpi.hosts { --accent: var(--green); }
+    .kpi.threats { --accent: var(--amber); }
+    .kpi.critical { --accent: var(--red); }
+
+    .panel { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 20px 22px 15px; border-bottom: 1px solid var(--border); }
+    .panel-title { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+    .panel-note { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .legend { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 14px; color: var(--muted); font: 500 11px/1.4 "IBM Plex Mono", monospace; }
+    .legend span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+    .dot, .linekey { display: inline-block; }
+    .dot { width: 8px; height: 8px; background: var(--red); border-radius: 50%; }
+    .linekey { width: 18px; height: 2px; background: var(--cyan); }
+    .chart-wrap { height: 330px; padding: 18px 18px 12px; }
+    #timelineFallback { display: none; width: 100%; height: 100%; }
+    .chart-fallback-note { display: none; color: var(--muted); text-align: center; font-size: 12px; padding-bottom: 12px; }
+
+    .section { margin-top: 34px; }
+    .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 14px; }
+    .section-heading h2 { font-size: clamp(23px, 2.5vw, 31px); margin: 0; letter-spacing: -.035em; }
+    .section-heading p { margin: 0; color: var(--muted); font-size: 13px; }
+    .filters { display: flex; gap: 7px; flex-wrap: wrap; }
+    .filter-btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: 8px 12px;
+      cursor: pointer;
+      font: 600 11px/1 "IBM Plex Mono", monospace;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .filter-btn:hover, .filter-btn:focus-visible { border-color: var(--cyan); outline: none; }
+    .filter-btn.active { background: var(--cyan-soft); border-color: var(--cyan); color: var(--cyan); }
+
+    .incidents { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .incident {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 21px;
+      position: relative;
+      transition: border-color .2s ease, background .2s ease;
+    }
+    .incident:hover { border-color: var(--border-strong); }
+    .incident.hidden { display: none; }
+    .incident:nth-child(5) { grid-column: 1 / -1; }
+    .incident-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    .incident-index { color: var(--faint); font: 500 11px/1 "IBM Plex Mono", monospace; margin-bottom: 10px; display: block; }
+    .incident h3 { margin: 0; font-size: 18px; letter-spacing: -.018em; line-height: 1.25; }
+    .severity { flex: 0 0 auto; padding: 5px 8px; font: 600 10px/1 "IBM Plex Mono", monospace; text-transform: uppercase; letter-spacing: .06em; }
+    .severity.critical { color: var(--red); background: var(--red-soft); border: 1px solid color-mix(in srgb, var(--red), transparent 55%); }
+    .severity.high { color: var(--amber); background: var(--amber-soft); border: 1px solid color-mix(in srgb, var(--amber), transparent 55%); }
+    .incident-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 14px 0 12px; color: var(--muted); font: 500 11px/1.4 "IBM Plex Mono", monospace; }
+    .host { color: var(--cyan); }
+    .incident-summary { color: var(--muted); margin: 0; font-size: 14px; max-width: 85ch; }
+    .incident-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+    .method { color: var(--green); background: var(--green-soft); padding: 5px 8px; font: 500 10px/1 "IBM Plex Mono", monospace; }
+    .review-btn { border: 0; background: transparent; padding: 5px 0; color: var(--cyan); cursor: pointer; font: 600 11px/1 "IBM Plex Mono", monospace; }
+    .review-btn:hover, .review-btn:focus-visible { text-decoration: underline; outline: none; }
+    .response { display: none; margin-top: 14px; background: var(--surface-2); padding: 13px 14px; color: var(--text); font-size: 13px; border-top: 1px solid var(--border); }
+    .response.open { display: block; }
+    .response strong { color: var(--red); font-family: "IBM Plex Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+
+    .risk-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, .7fr); gap: 12px; }
+    .table-panel { padding-bottom: 6px; }
+    .table-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+    .search-wrap { position: relative; flex: 1; max-width: 320px; }
+    .search-wrap svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 14px; color: var(--faint); }
+    .search-wrap input { width: 100%; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); padding: 9px 11px 9px 34px; font: 500 12px/1 "IBM Plex Mono", monospace; border-radius: 0; }
+    .search-wrap input:focus { border-color: var(--cyan); outline: none; }
+    .table-count { color: var(--muted); font: 500 11px/1 "IBM Plex Mono", monospace; white-space: nowrap; }
+    table { width: 100%; border-collapse: collapse; }
+    th { color: var(--faint); font: 600 10px/1.3 "IBM Plex Mono", monospace; text-transform: uppercase; letter-spacing: .06em; text-align: left; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+    td { padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: var(--surface-2); }
+    .rank { color: var(--faint); font-family: "IBM Plex Mono", monospace; width: 40px; }
+    .risk-host { font-family: "IBM Plex Mono", monospace; color: var(--text); font-weight: 600; }
+    .score-wrap { display: flex; align-items: center; gap: 9px; }
+    .score { width: 32px; font: 600 12px/1 "IBM Plex Mono", monospace; color: var(--score-color); }
+    .bar { width: 72px; height: 5px; background: var(--surface-3); overflow: hidden; }
+    .bar i { display: block; height: 100%; width: calc(var(--risk) * 1%); background: var(--score-color); }
+    .last-seen { color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+    .no-results { display: none; padding: 26px 18px; color: var(--muted); text-align: center; font-size: 13px; }
+
+    .posture { background: var(--surface); border: 1px solid var(--border); padding: 22px; }
+    .posture h3 { margin: 0; font-size: 18px; }
+    .posture-copy { color: var(--muted); font-size: 13px; margin: 8px 0 18px; }
+    .gauge {
+      width: 160px; aspect-ratio: 2 / 1; margin: 26px auto 8px; position: relative; overflow: hidden;
+    }
+    .gauge::before { content: ""; position: absolute; width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(from 270deg, var(--amber) 0 68%, var(--surface-3) 68% 100%); }
+    .gauge::after { content: ""; position: absolute; inset: 24px 24px -80px; border-radius: 50%; background: var(--surface); }
+    .gauge-value { position: absolute; z-index: 1; inset: auto 0 0; text-align: center; font: 600 34px/1 "IBM Plex Mono", monospace; color: var(--amber); }
+    .gauge-label { text-align: center; color: var(--muted); font: 500 11px/1 "IBM Plex Mono", monospace; text-transform: uppercase; letter-spacing: .07em; }
+    .posture-list { margin-top: 24px; }
+    .posture-row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--border); font-size: 12px; }
+    .posture-row span:first-child { color: var(--muted); }
+    .posture-row strong { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+
+    .workflow { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--border); background: var(--surface); }
+    .step { padding: 26px; position: relative; min-height: 220px; }
+    .step + .step { border-left: 1px solid var(--border); }
+    .step-num { color: var(--cyan); font: 600 12px/1 "IBM Plex Mono", monospace; }
+    .step-icon { width: 40px; height: 40px; margin: 24px 0 20px; color: var(--cyan); }
+    .step h3 { margin: 0 0 9px; font-size: 17px; }
+    .step p { color: var(--muted); margin: 0; font-size: 13px; }
+    .step-arrow { position: absolute; right: -11px; top: 50%; z-index: 2; width: 22px; height: 22px; display: grid; place-items: center; background: var(--surface-3); color: var(--cyan); border: 1px solid var(--border); }
+    .step:last-child .step-arrow { display: none; }
+
+    footer { margin-top: 36px; padding-top: 22px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .stack-label { color: var(--faint); font: 600 10px/1 "IBM Plex Mono", monospace; text-transform: uppercase; letter-spacing: .08em; }
+    .stack { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+    .stack span { border: 1px solid var(--border); background: var(--surface); padding: 7px 9px; color: var(--muted); font: 500 10px/1 "IBM Plex Mono", monospace; }
+
+    @media (max-width: 920px) {
+      .kpis { grid-template-columns: repeat(2, 1fr); }
+      .risk-layout { grid-template-columns: 1fr; }
+      .posture { display: grid; grid-template-columns: 1fr 180px; align-items: center; gap: 0 20px; }
+      .posture h3, .posture-copy, .posture-list { grid-column: 1; }
+      .posture .gauge, .posture .gauge-label { grid-column: 2; grid-row: 1 / span 3; }
+      .posture .gauge-label { align-self: end; padding-bottom: 16px; }
+    }
+
+    @media (max-width: 680px) {
+      .shell { padding: 18px 14px 36px; }
+      .topbar { display: block; }
+      .window { margin-top: 18px; min-width: 0; width: 100%; box-shadow: none; }
+      .kpis { gap: 8px; }
+      .kpi { min-height: 118px; padding: 16px; }
+      .kpi .icon { margin-bottom: 14px; }
+      .panel-head, .section-heading { display: block; }
+      .legend { justify-content: flex-start; margin-top: 12px; }
+      .chart-wrap { height: 290px; padding: 14px 8px 8px; }
+      .filters { margin-top: 12px; }
+      .incidents { grid-template-columns: 1fr; }
+      .incident:nth-child(5) { grid-column: auto; }
+      .incident { padding: 17px; }
+      .incident-footer { align-items: flex-end; }
+      .posture { display: block; }
+      .workflow { grid-template-columns: 1fr; }
+      .step { min-height: 0; padding: 22px; }
+      .step + .step { border-left: 0; border-top: 1px solid var(--border); }
+      .step-icon { margin: 18px 0 14px; }
+      .step-arrow { right: auto; left: 24px; top: auto; bottom: -11px; transform: rotate(90deg); }
+      footer { align-items: flex-start; flex-direction: column; }
+      .stack { justify-content: flex-start; }
+
+      table, thead, tbody, tr, td { display: block; }
+      thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+      tbody tr { padding: 12px 16px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+      tbody tr:last-child { border-bottom: 0; }
+      td { border: 0; padding: 0; min-width: 0; }
+      td::before { content: attr(data-label); display: block; color: var(--faint); font: 600 9px/1 "IBM Plex Mono", monospace; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+      td.rank { display: none; }
+      .score-wrap { gap: 6px; }
+      .bar { width: min(84px, 20vw); }
+    }
+
+    @media (max-width: 430px) {
+      .kpi .value { font-size: 23px; }
+      .kpi .label { font-size: 11px; }
+      .table-tools { display: block; }
+      .search-wrap { max-width: none; }
+      .table-count { display: block; margin-top: 10px; }
+      .incident-top { display: block; }
+      .severity { display: inline-block; margin-top: 11px; }
+      tbody tr { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="system-line"><span class="pulse" aria-hidden="true"></span>Demo mode · static telemetry</div>
+        <h1>EventLog Analyzer</h1>
+        <p class="subtitle">ML-powered Windows Event Log threat detection</p>
+        <p class="credit">Built by Rittu Vijai · Senior Endpoint Engineer</p>
+      </div>
+      <div class="window" aria-label="Assessment window">
+        <span class="label">Assessment window</span>
+        <span class="date">SEP 13 — OCT 12, 2026</span>
+      </div>
+    </header>
+
+    <section class="kpis" aria-label="Security overview">
+      <article class="kpi events">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 19V9m5 10V5m5 14v-7m5 7V3"/></svg>
+        <span class="value">93,280</span><span class="label">Total events analyzed</span>
+      </article>
+      <article class="kpi hosts">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/></svg>
+        <span class="value">100</span><span class="label">Hosts monitored</span>
+      </article>
+      <article class="kpi threats">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3 3.8 7v5.7c0 4.2 3.5 7.1 8.2 8.3 4.7-1.2 8.2-4.1 8.2-8.3V7L12 3Z"/><path d="M12 7v6m0 3h.01"/></svg>
+        <span class="value">5</span><span class="label">Threats detected</span>
+      </article>
+      <article class="kpi critical">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg>
+        <span class="value">3</span><span class="label">Critical incidents</span>
+      </article>
+    </section>
+
+    <section class="panel" aria-labelledby="timeline-title">
+      <div class="panel-head">
+        <div><h2 class="panel-title" id="timeline-title">Anomaly timeline</h2><p class="panel-note">Event volume and confirmed threat detections across 30 days</p></div>
+        <div class="legend" aria-label="Chart legend"><span><i class="linekey"></i>Event volume</span><span><i class="dot"></i>Detected attack</span></div>
+      </div>
+      <div class="chart-wrap"><canvas id="timeline" role="img" aria-label="Thirty-day event volume timeline with five attacks marked"></canvas><svg id="timelineFallback" viewBox="0 0 900 300" role="img" aria-label="Timeline fallback"></svg></div>
+      <div class="chart-fallback-note" id="fallbackNote">Chart library unavailable — static event profile shown.</div>
+    </section>
+
+    <section class="section" aria-labelledby="incidents-title">
+      <div class="section-heading">
+        <div><h2 id="incidents-title">Detected incidents</h2><p id="incidentCount">5 incidents across 12 affected hosts</p></div>
+        <div class="filters" aria-label="Filter incidents">
+          <button class="filter-btn active" type="button" data-filter="all" aria-pressed="true">All 5</button>
+          <button class="filter-btn" type="button" data-filter="critical" aria-pressed="false">Critical 3</button>
+          <button class="filter-btn" type="button" data-filter="high" aria-pressed="false">High 2</button>
+        </div>
+      </div>
+
+      <div class="incidents">
+        <article class="incident" data-severity="critical" id="incident-bruteforce">
+          <div class="incident-top"><div><span class="incident-index">INC-2026-041</span><h3>Brute-Force Logon Attack</h3></div><span class="severity critical">Critical</span></div>
+          <div class="incident-meta"><span class="host">WS-4821</span><span>SEP 18 · 09:43</span><span>4625 / FAILED LOGON</span></div>
+          <p class="incident-summary">WS-4821 recorded 48 failed logons in three minutes from three source IPs, followed by a successful sign-in. Isolate the host now, reset the affected credentials, and revoke active sessions.</p>
+          <div class="response"><strong>Recommended response</strong><br>Isolate the host, reset the affected credentials, revoke active sessions, and block the source IPs pending investigation.</div>
+          <div class="incident-footer"><span class="method">Signature Rule</span><button class="review-btn" type="button" aria-expanded="false">View response →</button></div>
+        </article>
+
+        <article class="incident" data-severity="critical" id="incident-ransomware">
+          <div class="incident-top"><div><span class="incident-index">INC-2026-044</span><h3>Ransomware File Encryption Pattern</h3></div><span class="severity critical">Critical</span></div>
+          <div class="incident-meta"><span class="host">SRV-007</span><span>SEP 23 · 02:14</span><span>4663 / FILE ACCESS</span></div>
+          <p class="incident-summary">SRV-007 encrypted 321 files in 12 minutes at 2:14 AM, rapidly changing files across shared folders. Isolate the server immediately, preserve evidence, and restore clean data from a verified backup.</p>
+          <div class="response"><strong>Recommended response</strong><br>Immediately isolate SRV-007, stop the encryption process, preserve forensic evidence, and restore clean data from a verified backup.</div>
+          <div class="incident-footer"><span class="method">Isolation Forest ML</span><button class="review-btn" type="button" aria-expanded="false">View response →</button></div>
+        </article>
+
+        <article class="incident" data-severity="high" id="incident-offhours">
+          <div class="incident-top"><div><span class="incident-index">INC-2026-048</span><h3>Off-Hours Admin Activity</h3></div><span class="severity high">High</span></div>
+          <div class="incident-meta"><span class="host">WS-1103</span><span>SEP 29 · 03:02</span><span>4672 / SPECIAL PRIVILEGES</span></div>
+          <p class="incident-summary">A service account performed 12 privileged actions on WS-1103 at 3 AM, outside its normal activity window and without approved maintenance. Review the account’s recent actions, confirm ownership, and rotate its credentials.</p>
+          <div class="response"><strong>Recommended response</strong><br>Review the service account’s recent activity, validate task ownership, rotate its credential, and restrict unnecessary privileges.</div>
+          <div class="incident-footer"><span class="method">Isolation Forest ML</span><button class="review-btn" type="button" aria-expanded="false">View response →</button></div>
+        </article>
+
+        <article class="incident" data-severity="critical" id="incident-process">
+          <div class="incident-top"><div><span class="incident-index">INC-2026-053</span><h3>Suspicious Process Chain</h3></div><span class="severity critical">Critical</span></div>
+          <div class="incident-meta"><span class="host">WS-2944</span><span>OCT 06 · 14:27</span><span>4688 / PROCESS CREATION</span></div>
+          <p class="incident-summary">WS-2944 launched a four-stage chain: Office macro → PowerShell → encoded command → remote download. Isolate the endpoint, run an EDR deep scan, and hunt for the same indicators across all endpoints.</p>
+          <div class="response"><strong>Recommended response</strong><br>Run an EDR deep scan, isolate WS-2944, collect the process tree and downloaded payload, and hunt for the same indicators across all endpoints.</div>
+          <div class="incident-footer"><span class="method">Signature Rule</span><button class="review-btn" type="button" aria-expanded="false">View response →</button></div>
+        </article>
+
+        <article class="incident" data-severity="high" id="incident-outage">
+          <div class="incident-top"><div><span class="incident-index">INC-2026-057</span><h3>Mass Service Outage</h3></div><span class="severity high">High</span></div>
+          <div class="incident-meta"><span class="host">8 HOSTS</span><span>OCT 10 · 11:18</span><span>7031 / SERVICE CONTROL</span></div>
+          <p class="incident-summary">The analyzer linked 291 service failures across eight hosts inside a 17-minute window, pointing to a shared operational change. Check the latest patch deployment, pause the rollout, and confirm service recovery before resuming.</p>
+          <div class="response"><strong>Recommended response</strong><br>Check the latest patch deployment and change record, pause the affected rollout, and validate service recovery before resuming.</div>
+          <div class="incident-footer"><span class="method">Correlation Rule</span><button class="review-btn" type="button" aria-expanded="false">View response →</button></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="risk-title">
+      <div class="section-heading"><div><h2 id="risk-title">Host risk ranking</h2><p>Prioritized by incident severity, frequency, and anomaly score</p></div></div>
+      <div class="risk-layout">
+        <div class="panel table-panel">
+          <div class="table-tools">
+            <label class="search-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Filter hosts</span><input id="hostSearch" type="search" placeholder="Filter hosts…" autocomplete="off"></label>
+            <span class="table-count" id="hostCount">10 hosts shown</span>
+          </div>
+          <table aria-label="Top ten riskiest hosts">
+            <thead><tr><th>#</th><th>Host</th><th>Risk score</th><th>Incidents</th><th>Last seen</th></tr></thead>
+            <tbody id="riskRows">
+              <tr data-host="SRV-007"><td class="rank" data-label="Rank">01</td><td class="risk-host" data-label="Host">SRV-007</td><td data-label="Risk score"><div class="score-wrap" style="--risk:98;--score-color:var(--red)"><span class="score">98</span><span class="bar"><i></i></span></div></td><td data-label="Incidents">2</td><td class="last-seen" data-label="Last seen">2 min ago</td></tr>
+              <tr data-host="WS-2944"><td class="rank" data-label="Rank">02</td><td class="risk-host" data-label="Host">WS-2944</td><td data-label="Risk score"><div class="score-wrap" style="--risk:94;--score-color:var(--red)"><span class="score">94</span><span class="bar"><i></i></span></div></td><td data-label="Incidents">1</td><td class="last-seen" data-label="Last seen">6 min ago</td></tr>
+              <tr data-host="WS-4821"><td class="rank" data-label="Rank">03</td><td class="risk-host" data-label="Host">WS-4821</td><td data-label="Risk score"><div class="score-wrap" style="--risk:91;--score-color:var(--red)"><span class="score">91</span><span class="bar"><i></i></span></div></td><td data-label="Incidents">2</td><td class="last-seen" data-label="Last seen">11 min ago</td></tr>
+              <tr data-host="WS-1103"><td class="rank" data-label="Rank">04</td><td class="risk-host" data-label="Host">WS-1103</td><td data-label="Risk score"><div class="score-wrap" style="--risk:82;--score-color:var(--amber)"><span class="score">82</span><span class="bar"><i></i></span></div></td><td data-label="Incidents">1</td><td class="last-seen" data-label="Last seen">18 min ago</td></tr>
+              <tr data-host="SRV-021"><td class="rank" data-label="Rank">05</td><td class="risk-host" data-label="Host">SRV-021</td><td data-label="Risk score"><div class="score-wrap" style="--risk:76;--score-color:var(--amber)"><span class="score">76</span><span class="bar"><i></i></span></div></td><td data-label="Incidents">1</td><td class="last-seen" data-label="Last seen">22 min ago</td></tr>
+              <tr data-host="WS-3310"><td class="rank" data-label="Rank">06</td><td class="risk-host" data-label="Host">WS-3310</td><td data-label="Risk score"><div class="score-wrap" style="--risk:69;--score-color:var(--amber)"><span class="score">69</span><span class="bar"><i></i></span></div></td><td data-label="Incidents">1</td><td class="last-seen" data-label="Last seen">29 min ago</td></tr>
+              <tr data-host="WS-0772"><td class="rank" data-label="Rank">07</td><td class="risk-host" data-label="Host">WS-0772</td><td data-label="Risk score"><div class="score-wrap" style="--risk:63;--score-color:var(--amber)"><span class="score">63</span><span class="bar"><i></i></span></div></td><td data-label="Incidents">1</td><td class="last-seen" data-label="Last seen">34 min ago</td></tr>
+              <tr data-host="SRV-012"><td class="rank" data-label="Rank">08</td><td class="risk-host" data-label="Host">SRV-012</td><td data-label="Risk score"><div class="score-wrap" style="--risk:57;--score-color:var(--green)"><span class="score">57</span><span class="bar"><i></i></span></div></td><td data-label="Incidents">1</td><td class="last-seen" data-label="Last seen">42 min ago</td></tr>
+              <tr data-host="WS-2088"><td class="rank" data-label="Rank">09</td><td class="risk-host" data-label="Host">WS-2088</td><td data-label="Risk score"><div class="score-wrap" style="--risk:51;--score-color:var(--green)"><span class="score">51</span><span class="bar"><i></i></span></div></td><td data-label="Incidents">1</td><td class="last-seen" data-label="Last seen">48 min ago</td></tr>
+              <tr data-host="WS-5017"><td class="rank" data-label="Rank">10</td><td class="risk-host" data-label="Host">WS-5017</td><td data-label="Risk score"><div class="score-wrap" style="--risk:46;--score-color:var(--green)"><span class="score">46</span><span class="bar"><i></i></span></div></td><td data-label="Incidents">1</td><td class="last-seen" data-label="Last seen">1 hr ago</td></tr>
+            </tbody>
+          </table>
+          <div class="no-results" id="noResults">No host matches that filter.</div>
+        </div>
+        <aside class="posture" aria-label="Environment risk posture">
+          <h3>Environment posture</h3><p class="posture-copy">Weighted from current incident severity and endpoint exposure.</p>
+          <div class="gauge"><span class="gauge-value">68</span></div><div class="gauge-label">Elevated risk</div>
+          <div class="posture-list"><div class="posture-row"><span>Critical hosts</span><strong style="color:var(--red)">3</strong></div><div class="posture-row"><span>Hosts with anomalies</span><strong>12</strong></div><div class="posture-row"><span>Clean endpoints</span><strong style="color:var(--green)">88</strong></div></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="how-title">
+      <div class="section-heading"><div><h2 id="how-title">How it works</h2><p>From raw telemetry to an analyst-ready response</p></div></div>
+      <div class="workflow">
+        <article class="step"><span class="step-num">01 / INGEST</span><svg class="step-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><ellipse cx="24" cy="10" rx="16" ry="6"/><path d="M8 10v12c0 3.3 7.2 6 16 6s16-2.7 16-6V10M8 22v12c0 3.3 7.2 6 16 6s16-2.7 16-6V22"/></svg><h3>Ingest Windows Event Logs</h3><p>Normalize security, system, PowerShell, and process creation events into a unified endpoint dataset.</p><span class="step-arrow" aria-hidden="true">→</span></article>
+        <article class="step"><span class="step-num">02 / DETECT</span><svg class="step-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M24 5 7 13v12c0 8.7 7.2 14.7 17 17 9.8-2.3 17-8.3 17-17V13L24 5Z"/><path d="m17 25 5 5 10-12"/></svg><h3>Hybrid ML + signature detection</h3><p>Combine deterministic threat rules with Isolation Forest scoring to catch both known attacks and abnormal behavior.</p><span class="step-arrow" aria-hidden="true">→</span></article>
+        <article class="step"><span class="step-num">03 / EXPLAIN</span><svg class="step-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 6h23l7 7v29H9V6Z"/><path d="M31 6v8h8M16 23h16M16 30h16M16 37h9"/></svg><h3>Plain-English incident reports</h3><p>Translate detection context into clear evidence, severity, affected hosts, and prioritized response actions.</p></article>
+      </div>
+    </section>
+
+    <footer>
+      <span class="stack-label">Detection stack</span>
+      <div class="stack" aria-label="Technology stack"><span>Python</span><span>scikit-learn / Isolation Forest</span><span>pandas</span><span>Streamlit</span><span>Plotly</span></div>
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      var labels = ['Sep 13','Sep 14','Sep 15','Sep 16','Sep 17','Sep 18','Sep 19','Sep 20','Sep 21','Sep 22','Sep 23','Sep 24','Sep 25','Sep 26','Sep 27','Sep 28','Sep 29','Sep 30','Oct 01','Oct 02','Oct 03','Oct 04','Oct 05','Oct 06','Oct 07','Oct 08','Oct 09','Oct 10','Oct 11','Oct 12'];
+      var volume = [2710,2850,2920,2790,3000,3140,2880,2950,3080,3420,2910,2840,3000,3100,2980,3260,3650,3040,2900,3160,3020,3200,3310,3790,3050,2940,3480,4110,3190,2610];
+      var attacks = [null,null,null,null,null,3440,null,null,null,null,3260,null,null,null,null,null,3970,null,null,null,null,null,null,4110,null,null,null,4430,null,null];
+      var root = getComputedStyle(document.documentElement);
+      var color = function(name) { return root.getPropertyValue(name).trim(); };
+      var ctx = document.getElementById('timeline');
+
+      function drawFallback() {
+        ctx.style.display = 'none';
+        var svg = document.getElementById('timelineFallback');
+        var note = document.getElementById('fallbackNote');
+        svg.style.display = 'block'; note.style.display = 'block';
+        var min = 2400, max = 4600;
+        var pts = volume.map(function(v, i){ return (36 + i * 28.2) + ',' + (260 - ((v-min)/(max-min))*210); }).join(' ');
+        var grid = '';
+        for (var y=50; y<=250; y+=50) grid += '<line x1="36" y1="'+y+'" x2="860" y2="'+y+'" stroke="'+color('--border')+'" stroke-width="1"/>';
+        var marks = attacks.map(function(v,i){ return v ? '<circle cx="'+(36+i*28.2)+'" cy="'+(260-((v-min)/(max-min))*210)+'" r="6" fill="'+color('--red')+'" stroke="'+color('--surface')+'" stroke-width="3"/>' : ''; }).join('');
+        svg.innerHTML = grid + '<polyline points="'+pts+'" fill="none" stroke="'+color('--cyan')+'" stroke-width="3"/>' + marks;
+      }
+
+      if (window.Chart) {
+        new Chart(ctx, {
+          type: 'line',
+          data: { labels: labels, datasets: [
+            { label: 'Event volume', data: volume, borderColor: color('--cyan'), backgroundColor: color('--cyan-soft'), borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: .32, fill: true, order: 2 },
+            { label: 'Detected attack', data: attacks, borderColor: 'transparent', backgroundColor: color('--red'), pointBackgroundColor: color('--red'), pointBorderColor: color('--surface'), pointBorderWidth: 3, pointRadius: 6, pointHoverRadius: 9, showLine: false, order: 1 }
+          ]},
+          options: {
+            maintainAspectRatio: false,
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: color('--surface-3'), titleColor: color('--text'), bodyColor: color('--muted'), borderColor: color('--border-strong'), borderWidth: 1, padding: 12, displayColors: true,
+                callbacks: { label: function(c) { return c.datasetIndex === 1 ? ' Confirmed attack' : ' ' + Number(c.raw).toLocaleString() + ' events'; } }
+              }
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { color: color('--faint'), font: { family: 'IBM Plex Mono', size: 10 }, maxTicksLimit: 8, maxRotation: 0 }, border: { color: color('--border') } },
+              y: { beginAtZero: false, suggestedMin: 2200, suggestedMax: 4700, grid: { color: color('--border') }, ticks: { color: color('--faint'), font: { family: 'IBM Plex Mono', size: 10 }, callback: function(v){ return (v/1000).toFixed(1) + 'k'; } }, border: { display: false } }
+            }
+          }
+        });
+      } else { drawFallback(); }
+
+      var buttons = document.querySelectorAll('.filter-btn');
+      var cards = document.querySelectorAll('.incident');
+      buttons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var filter = btn.getAttribute('data-filter');
+          buttons.forEach(function(b) { var active = b === btn; b.classList.toggle('active', active); b.setAttribute('aria-pressed', active ? 'true' : 'false'); });
+          var count = 0;
+          cards.forEach(function(card) { var show = filter === 'all' || card.getAttribute('data-severity') === filter; card.classList.toggle('hidden', !show); if (show) count++; });
+          document.getElementById('incidentCount').textContent = count + (count === 1 ? ' incident' : ' incidents') + (filter === 'all' ? ' across 12 affected hosts' : ' matching ' + filter + ' severity');
+        });
+      });
+
+      document.querySelectorAll('.review-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var card = btn.closest('.incident');
+          var response = card.querySelector('.response');
+          var open = !response.classList.contains('open');
+          response.classList.toggle('open', open);
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          btn.textContent = open ? 'Hide response ↑' : 'View response →';
+        });
+      });
+
+      var search = document.getElementById('hostSearch');
+      var rows = Array.prototype.slice.call(document.querySelectorAll('#riskRows tr'));
+      search.addEventListener('input', function() {
+        var q = search.value.trim().toUpperCase();
+        var visible = 0;
+        rows.forEach(function(row) { var show = row.getAttribute('data-host').indexOf(q) !== -1; row.style.display = show ? '' : 'none'; if (show) visible++; });
+        document.getElementById('hostCount').textContent = visible + (visible === 1 ? ' host shown' : ' hosts shown');
+        document.getElementById('noResults').style.display = visible ? 'none' : 'block';
+      });
+    })();
+  </script>
+</body>
+</html>
